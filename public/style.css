@@ -382,34 +382,3 @@ footer {
     border-bottom: 1px solid var(--border-color);
 }
 
-/* style.css - Adicione ou ajuste */
-
-.audio-controls-container {
-    display: flex;
-    align-items: center;
-    gap: 10px; 
-    /* Adicione um pouco de margem para afastar do logo e do toggle */
-    margin-right: 20px; 
-}
-
-.volume-icon {
-    font-size: 1.2em;
-    cursor: pointer; /* Indica que o ícone é clicável para mutar */
-    user-select: none;
-    transition: color 0.1s;
-}
-
-/* O estilo do #volume-slider pode ser mantido como o da última resposta */
-#volume-slider {
-    width: 80px; 
-    height: 6px;
-    cursor: pointer;
-    /* ... (restante dos estilos do slider) ... */
-}
-
-/* Garante que o header tenha espaço suficiente */
-header {
-    /* ... (código existente) ... */
-    /* Garanta que o header use justify-content: space-between; */
-    justify-content: space-between; 
-}

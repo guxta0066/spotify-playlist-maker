@@ -1,4 +1,4 @@
-// script.js - CÓDIGO FINAL E MAIS ROBUSTO (COM REGULADOR DE VOLUME)
+// script.js - CÓDIGO FINAL E MAIS ROBUSTO (COM MÚSICA DE FUNDO)
 
 // Variáveis de estado global
 let accessToken = null;
@@ -38,10 +38,9 @@ const newPlaylistNameContainer = document.getElementById('new-playlist-name-cont
 const playlistNameSuggestion = document.getElementById('playlist-name-suggestion');
 const logoutBtn = document.getElementById('logout-btn'); // Botão de Logout
 
-// NOVOS ELEMENTOS DOM PARA MÚSICA (USANDO musicToggleButton como o ícone de mute)
+// NOVOS ELEMENTOS DOM PARA MÚSICA
 const audioPlayer = document.getElementById('background-music');
-const musicToggleButton = document.getElementById('music-toggle-btn'); // Botão de Mute/Som (ou ícone)
-const volumeSlider = document.getElementById('volume-slider'); // Slider de volume
+const musicToggleButton = document.getElementById('music-toggle-btn');
 
 
 // Função para formatar números (ex: 1234567 -> 1.234.567)
@@ -105,12 +104,11 @@ newPlaylistNameInput.addEventListener('input', checkCreationButtonState);
 
 // LÓGICA DE CONTROLE DE MÚSICA
 const updateMusicButton = () => {
-    // Se o elemento existe no DOM, atualiza o ícone (🔊 ou 🔇)
     if (audioPlayer && musicToggleButton) {
-        if (audioPlayer.muted || audioPlayer.volume === 0) {
-            musicToggleButton.innerHTML = '🔇'; 
+        if (audioPlayer.muted) {
+            musicToggleButton.innerHTML = '🔇 Mutado';
         } else {
-            musicToggleButton.innerHTML = '🔊'; 
+            musicToggleButton.innerHTML = '🔊 Som';
         }
     }
 };
@@ -510,78 +508,26 @@ const createPlaylist = async () => {
 // ---------------------------------
 
 // LÓGICA DE CONTROLE DE MÚSICA DE FUNDO
-// Assumindo que musicToggleButton é o ÍCONE/ELEMENTO para MUTE/UNMUTE
 musicToggleButton.addEventListener('click', () => {
-    if (audioPlayer && volumeSlider) {
-        
-        const wasMuted = audioPlayer.muted;
-        
-        // 1. Alterna o estado de mute
-        audioPlayer.muted = !wasMuted;
+    if (audioPlayer) {
+        audioPlayer.muted = !audioPlayer.muted;
         localStorage.setItem('music_muted', audioPlayer.muted);
-        
-        if (!wasMuted) {
-            // Se mutou, move o slider visualmente para zero (mantendo o volume salvo)
-            volumeSlider.value = 0; 
-        } else {
-            // Se desmutou, restaura o volume do slider e do player
-            const savedVolume = parseFloat(localStorage.getItem('music_volume')) || 0.2;
-            audioPlayer.volume = savedVolume;
-            volumeSlider.value = savedVolume;
-            
-            // Força o play (supera o bloqueio de autoplay)
-            audioPlayer.play().catch(e => console.warn('Play manual OK.'));
-        }
-
         updateMusicButton();
+
+        // Tenta dar play se desmutado (para superar bloqueio de autoplay)
+        if (!audioPlayer.muted) {
+            audioPlayer.play().catch(e => console.warn('Autoplay bloqueado. Clique necessário.'));
+        }
     }
 });
 
-// NOVO: Listener para o Slider de volume
-if (volumeSlider) {
-    volumeSlider.addEventListener('input', () => {
-        if (audioPlayer) {
-            const newVolume = parseFloat(volumeSlider.value);
-            
-            // 1. Atualiza o volume do player
-            audioPlayer.volume = newVolume;
-            
-            // 2. Salva o último volume não-zero
-            if (newVolume > 0) {
-                localStorage.setItem('music_volume', newVolume);
-                audioPlayer.muted = false;
-                localStorage.setItem('music_muted', 'false');
-            } else {
-                // Se o volume chegou a zero, muta e salva
-                audioPlayer.muted = true;
-                localStorage.setItem('music_muted', 'true');
-            }
-            
-            updateMusicButton();
-        }
-    });
-}
-
-
 // Inicialização de áudio (chamada após DOMContentLoaded)
 const initAudio = () => {
-    if (audioPlayer && volumeSlider) {
+    if (audioPlayer) {
+        audioPlayer.volume = 0.2; // Volume baixo
         
-        // Tenta carregar o volume salvo (ou usa 0.2 como padrão)
-        const savedVolume = parseFloat(localStorage.getItem('music_volume')) || 0.2;
-        
-        audioPlayer.volume = savedVolume; 
-        volumeSlider.value = savedVolume; // Sincroniza o slider com o volume atual
-
-        // Carrega o estado de mute salvo
-        const isMuted = (localStorage.getItem('music_muted') === 'true');
-        audioPlayer.muted = isMuted;
-        
-        // Se estiver mutado, zera o slider (mas o volume real está salvo)
-        if (isMuted) {
-             volumeSlider.value = 0;
-        }
-
+        // Carrega o estado de mute do Local Storage
+        audioPlayer.muted = (localStorage.getItem('music_muted') === 'true');
         updateMusicButton();
 
         // Tenta dar play inicial (pode ser bloqueado pelo navegador)
@@ -594,8 +540,8 @@ const initAudio = () => {
 
 // Inicializar a autenticação e Áudio ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
-    initAuth();
-    initAudio();
+    initAuth();
+    initAudio();
 });
 
 // Listener do botão de pesquisa
