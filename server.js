@@ -1,4 +1,4 @@
-// server.js - CÓDIGO COMPLETO ATUALIZADO
+// server.js - CÓDIGO COMPLETO FINAL COM CORREÇÃO 429
 require('dotenv').config(); 
 const express = require('express');
 const axios = require('axios');
@@ -102,10 +102,9 @@ app.get('/callback', async (req, res) => {
 
 // -----------------------------------------------------
 // 3. Rota de API para Pesquisar Artista (COM FILTRO DE EXCLUSÃO)
-//    Esta rota SÓ retorna o artista mais relevante (e não as músicas)
 // -----------------------------------------------------
 app.post('/api/search-artist', async (req, res) => {
-    const { artistName, accessToken, excludedIds = [] } = req.body; // Recebe a lista de exclusão
+    const { artistName, accessToken, excludedIds = [] } = req.body; 
 
     if (!accessToken || !artistName) {
         return res.status(400).json({ error: 'Token de acesso e nome do artista são necessários.' });
@@ -117,7 +116,7 @@ app.post('/api/search-artist', async (req, res) => {
             params: {
                 q: artistName,
                 type: 'artist',
-                limit: 5 // Busca até 5 para ter margem de erro/refino
+                limit: 5 
             },
             headers: {
                 'Authorization': `Bearer ${accessToken}`
@@ -148,8 +147,7 @@ app.post('/api/search-artist', async (req, res) => {
 
 
 // -----------------------------------------------------
-// 4. Rota de API para Detalhes (Busca Músicas e Playlists)
-//    Esta rota é chamada SOMENTE após a confirmação do artista
+// 4. Rota de API para Detalhes (Busca Músicas e Playlists) - CORRIGIDA (com delay de 50ms)
 // -----------------------------------------------------
 app.post('/api/search-artist-details', async (req, res) => {
     const { accessToken, artistId, artistName } = req.body;
@@ -195,8 +193,14 @@ app.post('/api/search-artist-details', async (req, res) => {
                     };
                     allTracksMap.set(track.id, fullTrack);
                 });
+
+                // >>> CÓDIGO DE ATRASO (50ms) ADICIONADO AQUI PARA EVITAR O ERRO 429
+                await new Promise(resolve => setTimeout(resolve, 50)); 
+                
             } catch (albumError) {
                 console.warn(`Aviso: Não foi possível obter faixas do álbum ${albumId}.`, albumError.message);
+                // Adiciona um atraso maior em caso de erro de álbum
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
         
@@ -285,7 +289,7 @@ app.post('/api/create-playlist', async (req, res) => {
             }
         });
 
- res.json({ message: 'Playlist criada/atualizada com sucesso!', playlistId: playlistId });
+ res.json({ message: 'Playlist criada/atualizada com sucesso!', playlistId: playlistId });
 
     } catch (error) {
         console.error('Erro ao criar/adicionar playlist:', error.response ? error.response.data : error.message);
