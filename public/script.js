@@ -1,4 +1,4 @@
-// script.js - CÓDIGO FINAL E MAIS ROBUSTO (COM MÚSICA DE FUNDO)
+// script.js - CÓDIGO FINAL E MAIS ROBUSTO
 
 // Variáveis de estado global
 let accessToken = null;
@@ -37,11 +37,6 @@ const newPlaylistNameInput = document.getElementById('new-playlist-name');
 const newPlaylistNameContainer = document.getElementById('new-playlist-name-container');
 const playlistNameSuggestion = document.getElementById('playlist-name-suggestion');
 const logoutBtn = document.getElementById('logout-btn'); // Botão de Logout
-
-// NOVOS ELEMENTOS DOM PARA MÚSICA
-const audioPlayer = document.getElementById('background-music');
-const musicToggleButton = document.getElementById('music-toggle-btn');
-
 
 // Função para formatar números (ex: 1234567 -> 1.234.567)
 const formatNumber = (num) => {
@@ -102,17 +97,6 @@ const checkCreationButtonState = () => {
 existingPlaylistSelect.addEventListener('change', checkCreationButtonState);
 newPlaylistNameInput.addEventListener('input', checkCreationButtonState);
 
-// LÓGICA DE CONTROLE DE MÚSICA
-const updateMusicButton = () => {
-    if (audioPlayer && musicToggleButton) {
-        if (audioPlayer.muted) {
-            musicToggleButton.innerHTML = '🔇 Mutado';
-        } else {
-            musicToggleButton.innerHTML = '🔊 Som';
-        }
-    }
-};
-
 
 // ---------------------------------
 // Funções de Autenticação
@@ -124,7 +108,7 @@ const getTokensFromHash = () => {
     const params = new URLSearchParams(hash);
     
     const token = params.get('access_token');
-    const refreshTokenFromHash = params.get('refresh_token'); // LÊ o refresh token
+    const refreshTokenFromHash = params.get('refresh_token'); // LÊ o refresh token
     const error = params.get('error');
 
     if (error) {
@@ -135,9 +119,9 @@ const getTokensFromHash = () => {
     if (token) {
         // Armazenar tokens
         localStorage.setItem('spotify_access_token', token);
-        if (refreshTokenFromHash) {
-             localStorage.setItem('spotify_refresh_token', refreshTokenFromHash);
-        }
+        if (refreshTokenFromHash) {
+             localStorage.setItem('spotify_refresh_token', refreshTokenFromHash);
+        }
         // Limpar a URL (para segurança e estética)
         window.history.pushState("", document.title, window.location.pathname + window.location.search);
         return token;
@@ -147,12 +131,12 @@ const getTokensFromHash = () => {
 
 // NOVO: Função para desconectar o usuário (Logout)
 const logout = () => {
-    // 1. Remove os tokens do localStorage
-    localStorage.removeItem('spotify_access_token');
-    localStorage.removeItem('spotify_refresh_token'); 
-    
-    // 2. Redireciona para a raiz, forçando a tela de login
-    window.location.href = '/'; 
+    // 1. Remove os tokens do localStorage
+    localStorage.removeItem('spotify_access_token');
+    localStorage.removeItem('spotify_refresh_token'); 
+    
+    // 2. Redireciona para a raiz, forçando a tela de login
+    window.location.href = '/'; 
 };
 
 // Inicialização: Verifica se o usuário está logado
@@ -162,9 +146,9 @@ const initAuth = () => {
     if (!accessToken) {
         accessToken = localStorage.getItem('spotify_access_token');
     }
-    
-    // Tenta obter o refresh token salvo
-    refreshToken = localStorage.getItem('spotify_refresh_token'); 
+    
+    // Tenta obter o refresh token salvo
+    refreshToken = localStorage.getItem('spotify_refresh_token'); 
     
     if (accessToken) {
         // USUÁRIO LOGADO: MOSTRA APP, ESCONDE LOGIN
@@ -186,7 +170,7 @@ const initAuth = () => {
 // Busca o perfil do usuário logado (para mostrar o nome)
 const fetchUserProfile = async (token) => {
     try {
-        const response = await fetch(`${BASE_URL}/api/user-profile`, {
+        const response = await fetch('https://api.spotify.com/v1/me', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
@@ -194,7 +178,7 @@ const fetchUserProfile = async (token) => {
     } catch (error) {
         console.error('Erro ao buscar perfil:', error);
         // Se falhar, o token provavelmente expirou. 
-        // Chama logout para forçar novo login e limpar tokens antigos
+        // Chama logout para forçar novo login e limpar tokens antigos
         logout(); 
     }
 };
@@ -205,42 +189,42 @@ const fetchUserProfile = async (token) => {
 
 // Funcao Auxiliar para renovar o token
 const renewAccessToken = async () => {
-    if (!refreshToken) {
-        console.error("Refresh Token não disponível. Necessário novo login.");
-        logout();
-        return false;
-    }
-    
-    try {
-        searchStatus.className = 'status-message info-message';
-        searchStatus.textContent = 'Token expirado. Renovando sessão...';
+    if (!refreshToken) {
+        console.error("Refresh Token não disponível. Necessário novo login.");
+        logout();
+        return false;
+    }
+    
+    try {
+        searchStatus.className = 'status-message info-message';
+        searchStatus.textContent = 'Token expirado. Renovando sessão...';
 
-        const response = await fetch(`${BASE_URL}/refresh-token?refresh_token=${refreshToken}`);
-        
-        if (!response.ok) {
-            throw new Error('Falha na renovação do token.');
-        }
+        const response = await fetch(`${BASE_URL}/refresh-token?refresh_token=${refreshToken}`);
+        
+        if (!response.ok) {
+            throw new Error('Falha na renovação do token.');
+        }
 
-        const data = await response.json();
-        
-        // Salva o novo Access Token e, se houver, o novo Refresh Token
-        localStorage.setItem('spotify_access_token', data.access_token);
-        if (data.refresh_token) {
-            localStorage.setItem('spotify_refresh_token', data.refresh_token);
-            refreshToken = data.refresh_token; // Atualiza a variável global
-        }
-        accessToken = data.access_token; // Atualiza a variável global
-        
-        searchStatus.textContent = 'Sessão renovada com sucesso! Tente novamente.';
-        return true;
-        
-    } catch (e) {
-        console.error('Erro ao renovar token:', e);
-        searchStatus.className = 'status-message error-message';
-        searchStatus.textContent = 'Falha na renovação da sessão. Faça login novamente.';
-        logout();
-        return false;
-    }
+        const data = await response.json();
+        
+        // Salva o novo Access Token e, se houver, o novo Refresh Token
+        localStorage.setItem('spotify_access_token', data.access_token);
+        if (data.refresh_token) {
+            localStorage.setItem('spotify_refresh_token', data.refresh_token);
+            refreshToken = data.refresh_token; // Atualiza a variável global
+        }
+        accessToken = data.access_token; // Atualiza a variável global
+        
+        searchStatus.textContent = 'Sessão renovada com sucesso! Tente novamente.';
+        return true;
+        
+    } catch (e) {
+        console.error('Erro ao renovar token:', e);
+        searchStatus.className = 'status-message error-message';
+        searchStatus.textContent = 'Falha na renovação da sessão. Faça login novamente.';
+        logout();
+        return false;
+    }
 }
 
 
@@ -289,11 +273,11 @@ const performArtistSearch = async (query, excludedIds) => {
         });
 
         if (!response.ok) {
-            // Tenta renovar o token se for erro de autenticação (401)
-            if (response.status === 401 && refreshToken && await renewAccessToken()) {
-                // Tenta a busca novamente após a renovação
-                return await performArtistSearch(query, excludedIds);
-            }
+            // Tenta renovar o token se for erro de autenticação (401)
+            if (response.status === 401 && refreshToken && await renewAccessToken()) {
+                // Tenta a busca novamente após a renovação
+                return await performArtistSearch(query, excludedIds);
+            }
             const errorData = await response.json();
             throw new Error(errorData.error || 'Erro desconhecido na pesquisa.');
         }
@@ -304,7 +288,7 @@ const performArtistSearch = async (query, excludedIds) => {
         artistName = data.artist.name;
 
         // 1. Mostrar informações do artista
-        artistImage.src = data.artist.image || 'https://via.placeholder.com/80?text=PS'; // Placeholder limpo
+        artistImage.src = data.artist.image || 'https://via.placeholder.com/80?text=SPFC';
         artistNameEl.textContent = artistName;
         artistFollowersEl.textContent = formatNumber(data.artist.followers);
         artistInfoContainer.classList.remove('hidden');
@@ -336,11 +320,11 @@ const fetchTracksAndPlaylists = async () => {
         });
 
         if (!response.ok) {
-            // Tenta renovar o token se for erro de autenticação (401)
-            if (response.status === 401 && refreshToken && await renewAccessToken()) {
-                // Tenta a busca novamente após a renovação
-                return await fetchTracksAndPlaylists();
-            }
+            // Tenta renovar o token se for erro de autenticação (401)
+            if (response.status === 401 && refreshToken && await renewAccessToken()) {
+                // Tenta a busca novamente após a renovação
+                return await fetchTracksAndPlaylists();
+            }
             const errorData = await response.json();
             throw new Error(errorData.error || 'Erro desconhecido ao obter detalhes.');
         }
@@ -354,7 +338,7 @@ const fetchTracksAndPlaylists = async () => {
         populateTracksList(data.tracks);
         
         // --- LÓGICA DE SUGESTÃO DE NOME ---
-        const suggestedName = `Playlist de ${artistName}`; // Nome limpo
+        const suggestedName = `SPFC - Músicas de ${artistName}`;
         
         playlistNameSuggestion.querySelector('.suggestion-name').textContent = `"${suggestedName}"`;
         playlistNameSuggestion.classList.remove('hidden');
@@ -475,11 +459,11 @@ const createPlaylist = async () => {
         });
 
         if (!response.ok) {
-            // Tenta renovar o token se for erro de autenticação (401)
-            if (response.status === 401 && refreshToken && await renewAccessToken()) {
-                // Tenta a chamada novamente após a renovação
-                return await createPlaylist();
-            }
+             // Tenta renovar o token se for erro de autenticação (401)
+            if (response.status === 401 && refreshToken && await renewAccessToken()) {
+                // Tenta a chamada novamente após a renovação
+                return await createPlaylist();
+            }
             const errorData = await response.json();
             throw new Error(errorData.error || 'Erro desconhecido na criação.');
         }
@@ -487,8 +471,8 @@ const createPlaylist = async () => {
         const data = await response.json();
         
         creationStatus.className = 'status-message success-message';
-        const action = playlistOption === 'new' ? 'Playlist Criada' : 'Atualizada';
-        creationStatus.innerHTML = `${action} com sucesso! NOME: ${data.playlistName}.<br>Abra seu Spotify para conferir!`;
+        const action = playlistOption === 'new' ? 'Criada' : 'Atualizada';
+        creationStatus.innerHTML = `${action} com sucesso! ID: ${data.playlistId}.<br>Abra seu Spotify para conferir!`;
         
         if (playlistOption === 'new') {
              fetchTracksAndPlaylists(); 
@@ -507,42 +491,8 @@ const createPlaylist = async () => {
 // Adicionar Listeners e Inicializar
 // ---------------------------------
 
-// LÓGICA DE CONTROLE DE MÚSICA DE FUNDO
-musicToggleButton.addEventListener('click', () => {
-    if (audioPlayer) {
-        audioPlayer.muted = !audioPlayer.muted;
-        localStorage.setItem('music_muted', audioPlayer.muted);
-        updateMusicButton();
-
-        // Tenta dar play se desmutado (para superar bloqueio de autoplay)
-        if (!audioPlayer.muted) {
-            audioPlayer.play().catch(e => console.warn('Autoplay bloqueado. Clique necessário.'));
-        }
-    }
-});
-
-// Inicialização de áudio (chamada após DOMContentLoaded)
-const initAudio = () => {
-    if (audioPlayer) {
-        audioPlayer.volume = 0.2; // Volume baixo
-        
-        // Carrega o estado de mute do Local Storage
-        audioPlayer.muted = (localStorage.getItem('music_muted') === 'true');
-        updateMusicButton();
-
-        // Tenta dar play inicial (pode ser bloqueado pelo navegador)
-        if (!audioPlayer.muted) {
-            audioPlayer.play().catch(e => console.warn('Autoplay bloqueado.'));
-        }
-    }
-};
-
-
-// Inicializar a autenticação e Áudio ao carregar a página
-document.addEventListener('DOMContentLoaded', () => {
-    initAuth();
-    initAudio();
-});
+// Inicializar a autenticação ao carregar a página
+document.addEventListener('DOMContentLoaded', initAuth);
 
 // Listener do botão de pesquisa
 searchButton.addEventListener('click', searchArtist);
