@@ -336,7 +336,7 @@ app.post('/api/create-playlist', async (req, res) => {
             });
             
             // Pequeno delay entre lotes para evitar 429 (Embora menos comum aqui, é boa prática)
-            await new Promise(resolve => setTimeout(resolve, 50)); 
+            await new Promise(resolve => setTimeout(resolve, 250)); 
         }
 
  res.json({ message: 'Playlist criada/atualizada com sucesso!', playlistId: playlistId });
