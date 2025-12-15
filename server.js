@@ -1,4 +1,4 @@
-// server.js - CÓDIGO FINAL COM REFRESH TOKEN E BATCHING
+// server.js - CÓDIGO FINAL E OTIMIZADO
 require('dotenv').config(); 
 const express = require('express');
 const axios = require('axios');
@@ -184,7 +184,7 @@ app.post('/api/search-artist', async (req, res) => {
 
 
 // -----------------------------------------------------
-// 5. Rota de API para Detalhes (Busca Músicas e Playlists) - CORRIGIDA (com delay de 50ms)
+// 5. Rota de API para Detalhes (Busca Músicas e Playlists) - CORREÇÃO DE 429 AGRESSIVA
 // -----------------------------------------------------
 app.post('/api/search-artist-details', async (req, res) => {
     const { accessToken, artistId, artistName } = req.body;
@@ -231,8 +231,8 @@ app.post('/api/search-artist-details', async (req, res) => {
                     allTracksMap.set(track.id, fullTrack);
                 });
 
-                // >>> CÓDIGO DE ATRASO (50ms) ADICIONADO AQUI PARA EVITAR O ERRO 429
-                await new Promise(resolve => setTimeout(resolve, 50)); 
+                // >>> CÓDIGO DE ATRASO PARA EVITAR O ERRO 429
+                await new Promise(resolve => setTimeout(resolve, 750)); // AUMENTADO PARA 750MS
                 
             } catch (albumError) {
                 console.warn(`Aviso: Não foi possível obter faixas do álbum ${albumId}.`, albumError.message);
@@ -278,7 +278,7 @@ app.post('/api/search-artist-details', async (req, res) => {
 
 
 // ---------------------------------
-// 6. Rota de API para Criar Playlist (MODIFICADA: Batching 413)
+// 6. Rota de API para Criar Playlist (CORRIGIDA: ENDPOINT ROBUSTO E TRATAMENTO DE ERRO)
 // ---------------------------------
 app.post('/api/create-playlist', async (req, res) => {
     // NOVO: Adicionado newPlaylistName
@@ -320,31 +320,52 @@ app.post('/api/create-playlist', async (req, res) => {
         }
 
         // 3. Adicionar as faixas (músicas) à playlist (LÓGICA DE LOTES)
-        const batchSize = 100; // Máximo permitido pelo Spotify para POST /tracks
-        const totalTracks = trackUris.length;
+        const batchSize = 100; // Máximo permitido pelo Spotify para POST /tracks
+        const totalTracks = trackUris.length;
+        
+        // NOVO: ENDPOINT ROBUSTO PARA ADIÇÃO DE FAIXAS
+        const addTracksUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
 
-        for (let i = 0; i < totalTracks; i += batchSize) {
-            const batchUris = trackUris.slice(i, i + batchSize);
+        for (let i = 0; i < totalTracks; i += batchSize) {
+            const batchUris = trackUris.slice(i, i + batchSize);
+            
+            // O corpo da requisição precisa ser JSON
+            const body = { uris: batchUris };
             
-            await axios.post(`https://www.google.com/url?sa=E&source=gmail&q=https://api.spotify.com/v1/me/playlists?limit=50{playlistId}/tracks`, {
-                uris: batchUris // Envia apenas um lote
-            }, {
-                headers: { 
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            // Pequeno delay entre lotes para evitar 429 (Embora menos comum aqui, é boa prática)
-            await new Promise(resolve => setTimeout(resolve, 750)); 
-        }
+            try {
+                await axios.post(addTracksUrl, body, {
+                    headers: { 
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+            } catch (error) {
+                // Se a adição falhar em qualquer lote, pare e retorne o erro real do Spotify
+                console.error(`Erro ao adicionar lote ${i / batchSize + 1} de músicas à playlist:`, error.response ? error.response.data : error.message);
+                
+                // Lança um erro detalhado para o catch externo
+                const spotifyError = error.response ? error.response.data.error : { status: 500, message: 'Erro desconhecido ao adicionar faixas.' };
+                
+                throw new Error(`Falha ao adicionar músicas (Lote ${i / batchSize + 1}). Status: ${spotifyError.status}. Verifique se você tem permissão total para editar esta playlist.`);
+            }
+            
+            // Pequeno delay entre lotes para evitar 429
+            await new Promise(resolve => setTimeout(resolve, 50)); 
+        }
 
+        // Se chegar até aqui, é sucesso
  res.json({ message: 'Playlist criada/atualizada com sucesso!', playlistId: playlistId });
 
     } catch (error) {
-        console.error('Erro ao criar/adicionar playlist:', error.response ? error.response.data : error.message);
+        console.error('Erro fatal ao criar/adicionar playlist:', error.message);
+        
+        // Se o erro foi lançado do try/catch interno (problema de permissão), use a mensagem detalhada
+        const errorMessage = error.message.startsWith('Falha ao adicionar músicas') 
+            ? error.message 
+            : 'Falha grave ao criar ou adicionar músicas à playlist. Verifique o console do servidor para detalhes.';
+            
         res.status(error.response ? error.response.status : 500).json({ 
-            error: 'Falha ao criar ou adicionar músicas à playlist.', 
+            error: errorMessage, 
             details: error.response ? error.response.data : 'Erro interno.'
         });
     }
