@@ -1,7 +1,4 @@
-// script.js - CÓDIGO COMPLETO ATUALIZADO
-// IMPORTANTE: Este script usa `axios` que é definido no backend. 
-// Para que a comunicação com o backend funcione, estamos usando `fetch` ou `axios` 
-// que são nativos no navegador, mas o servidor Express deve estar rodando!
+// script.js - CÓDIGO FINAL COM LOGOUT E NOVO FLUXO
 
 // Variáveis de estado global
 let accessToken = null;
@@ -41,6 +38,9 @@ const artistConfirmationButtons = document.getElementById('artist-confirmation-b
 const newPlaylistNameInput = document.getElementById('new-playlist-name'); 
 const newPlaylistNameContainer = document.getElementById('new-playlist-name-container');
 const playlistNameSuggestion = document.getElementById('playlist-name-suggestion');
+
+// NOVO ELEMENTO DOM PARA LOGOUT
+const logoutBtn = document.getElementById('logout-btn');
 
 
 // Função para formatar números (ex: 1234567 -> 1.234.567)
@@ -86,13 +86,13 @@ playlistDestinationSelect.addEventListener('change', (e) => {
 const checkCreationButtonState = () => {
     const selectedTracks = tracksList.querySelectorAll('input[type="checkbox"]:checked').length;
     const isExistingMode = playlistDestinationSelect.value === 'existing';
-    const isNewMode = playlistDestinationSelect.value === 'new';
-    
+    const isNewMode = playlistDestinationSelect.value === 'new';
+    
     // Checagem para modo "Existente"
     const isPlaylistSelected = existingPlaylistSelect.value !== ''; 
-    
-    // Checagem para modo "Nova"
-    const isNewNameProvided = newPlaylistNameInput.value.trim().length > 0;
+    
+    // Checagem para modo "Nova"
+    const isNewNameProvided = newPlaylistNameInput.value.trim().length > 0;
 
     if (selectedTracks > 0 && 
        ((isExistingMode && isPlaylistSelected) || (isNewMode && isNewNameProvided))) {
@@ -155,6 +155,16 @@ const initAuth = () => {
     }
 };
 
+// NOVO: Função para desconectar o usuário (Logout)
+const logout = () => {
+    // 1. Remove o token do localStorage
+    localStorage.removeItem('spotify_access_token');
+    
+    // 2. Redireciona para a raiz, forçando a tela de login
+    window.location.href = '/'; 
+};
+
+
 // ---------------------------------
 // Funções de API Spotify
 // ---------------------------------
@@ -207,10 +217,10 @@ const performArtistSearch = async (query, excludedIds) => {
     artistConfirmationButtons.classList.add('hidden'); 
     playlistCreatorSection.classList.add('hidden');
     createPlaylistBtn.disabled = true;
-    
-    // Esconder a sugestão de nome ao iniciar a busca
-    playlistNameSuggestion.classList.add('hidden');
-    newPlaylistNameInput.value = ''; // Limpa o campo de nome
+    
+    // Esconder a sugestão de nome ao iniciar a busca
+    playlistNameSuggestion.classList.add('hidden');
+    newPlaylistNameInput.value = ''; // Limpa o campo de nome
 
     try {
         // Faz a requisição para buscar o artista mais relevante (que não esteja excluído)
@@ -278,22 +288,22 @@ const fetchTracksAndPlaylists = async () => {
 
         // 2. Preencher lista de músicas (com checkbox)
         populateTracksList(data.tracks);
-        
-        // --- LÓGICA DE SUGESTÃO DE NOME ---
-        const suggestedName = `SPFC - Músicas de ${artistName}`;
-        
-        // Atualiza o texto da sugestão com o nome
-        playlistNameSuggestion.querySelector('.suggestion-name').textContent = `"${suggestedName}"`;
-        playlistNameSuggestion.classList.remove('hidden');
-        
-        // Define a sugestão como "dado" no elemento para o listener pegar
-        playlistNameSuggestion.dataset.suggestedName = suggestedName;
-        
-        // Garante que o campo de nome está visível se for a opção 'new'
-        if (playlistDestinationSelect.value === 'new') {
-            newPlaylistNameContainer.classList.remove('hidden');
-        }
-        // --- FIM LÓGICA DE SUGESTÃO DE NOME ---
+        
+        // --- LÓGICA DE SUGESTÃO DE NOME ---
+        const suggestedName = `SPFC - Músicas de ${artistName}`;
+        
+        // Atualiza o texto da sugestão com o nome
+        playlistNameSuggestion.querySelector('.suggestion-name').textContent = `"${suggestedName}"`;
+        playlistNameSuggestion.classList.remove('hidden');
+        
+        // Define a sugestão como "dado" no elemento para o listener pegar
+        playlistNameSuggestion.dataset.suggestedName = suggestedName;
+        
+        // Garante que o campo de nome está visível se for a opção 'new'
+        if (playlistDestinationSelect.value === 'new') {
+            newPlaylistNameContainer.classList.remove('hidden');
+        }
+        // --- FIM LÓGICA DE SUGESTÃO DE NOME ---
 
         playlistCreatorSection.classList.remove('hidden');
         searchStatus.className = 'status-message success-message';
@@ -372,15 +382,15 @@ const createPlaylist = async () => {
     // 2. Coletar opções
     const playlistOption = playlistDestinationSelect.value;
     const targetPlaylistId = existingPlaylistSelect.value;
-    const newPlaylistName = newPlaylistNameInput.value.trim(); // NOVO: Obter nome
+    const newPlaylistName = newPlaylistNameInput.value.trim(); // NOVO: Obter nome
 
-    // Validação do Nome da Nova Playlist
-    if (playlistOption === 'new' && newPlaylistName.length === 0) {
-        creationStatus.className = 'status-message error-message';
-        creationStatus.textContent = 'Por favor, digite ou clique na sugestão para dar um nome para a nova playlist.';
-        createPlaylistBtn.disabled = false;
-        return;
-    }
+    // Validação do Nome da Nova Playlist
+    if (playlistOption === 'new' && newPlaylistName.length === 0) {
+        creationStatus.className = 'status-message error-message';
+        creationStatus.textContent = 'Por favor, digite ou clique na sugestão para dar um nome para a nova playlist.';
+        createPlaylistBtn.disabled = false;
+        return;
+    }
 
     if (playlistOption === 'existing' && !targetPlaylistId) {
         creationStatus.className = 'status-message error-message';
@@ -402,7 +412,7 @@ const createPlaylist = async () => {
                 trackUris: selectedUris,
                 playlistOption: playlistOption,
                 targetPlaylistId: targetPlaylistId,
-                newPlaylistName: newPlaylistName // ENVIAR O NOME PERSONALIZADO
+                newPlaylistName: newPlaylistName // ENVIAR O NOME PERSONALIZADO
             })
         });
 
@@ -419,11 +429,8 @@ const createPlaylist = async () => {
         
         // Se a playlist foi criada, recarregar as playlists do usuário
         if (playlistOption === 'new') {
-             // O ideal seria chamar performArtistSearch, mas para simplificar,
-             // vamos apenas buscar o artista novamente para atualizar as playlists
-             // NOTE: searchArtist chama performArtistSearch, que reinicia o ciclo
-              // Vamos chamar fetchTracksAndPlaylists diretamente para recarregar playlists sem confirmar o artista.
-              fetchTracksAndPlaylists(); 
+             // Recarrega as playlists sem iniciar o ciclo de busca do artista
+              fetchTracksAndPlaylists(); 
         }
 
     } catch (error) {
@@ -455,12 +462,12 @@ createPlaylistBtn.addEventListener('click', createPlaylist);
 
 // NOVO: Listener para preenchimento da sugestão de nome
 playlistNameSuggestion.addEventListener('click', () => {
-    // Pega o nome sugerido que armazenamos no dataset
-    const suggestedName = playlistNameSuggestion.dataset.suggestedName;
-    if (suggestedName) {
-        newPlaylistNameInput.value = suggestedName;
-        checkCreationButtonState(); // Reabilita o botão Criar Playlist
-    }
+    // Pega o nome sugerido que armazenamos no dataset
+    const suggestedName = playlistNameSuggestion.dataset.suggestedName;
+    if (suggestedName) {
+        newPlaylistNameInput.value = suggestedName;
+        checkCreationButtonState(); // Reabilita o botão Criar Playlist
+    }
 });
 
 

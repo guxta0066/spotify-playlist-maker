@@ -370,3 +370,14 @@ footer {
     color: var(--secondary-color); /* Muda a cor ao passar o mouse */
     border-bottom-color: var(--secondary-color);
 }
+
+/* public/style.css - Adicione ou ajuste */
+
+.user-status-container {
+    display: flex;
+    justify-content: space-between; /* Alinha o texto à esquerda e o botão à direita */
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
