@@ -43,6 +43,45 @@ app.get('/login', (req, res) => {
   );
 });
 
+// Rota de callback do Spotify
+app.get('/callback', async (req, res) => {
+  const code = req.query.code || null;
+  const state = req.query.state || null;
+  const storedState = req.cookies ? req.cookies.spotify_auth_state : null;
+
+  if (state === null || state !== storedState) {
+    res.redirect('/#' + querystring.stringify({ error: 'state_mismatch' }));
+  } else {
+    res.clearCookie('spotify_auth_state');
+    try {
+      const response = await axios.post(
+        'https://accounts.spotify.com/api/token',
+        querystring.stringify({
+          grant_type: 'authorization_code',
+          code: code,
+          redirect_uri: REDIRECT_URI
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Basic ' + Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64')
+          }
+        }
+      );
+
+      const { access_token, refresh_token } = response.data;
+
+      // Redireciona para o frontend com os tokens na URL hash
+      res.redirect('/#' + querystring.stringify({
+        access_token,
+        refresh_token
+      }));
+    } catch (error) {
+      console.error('Erro ao obter tokens:', error.response ? error.response.data : error.message);
+      res.redirect('/#' + querystring.stringify({ error: 'invalid_token' }));
+    }
+  }
+});
 
 // ---------------------------------
 // 6. Rota de API para Criar Playlist (ENDPOINT ROBUSTO)
