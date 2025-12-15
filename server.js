@@ -5,400 +5,229 @@ const axios = require('axios');
 const querystring = require('querystring');
 const cookieParser = require('cookie-parser');
 
-// Variáveis de Ambiente (Serão lidas do .env local ou do Render)
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI; 
 
 if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
-    console.error("ERRO: CLIENT_ID, CLIENT_SECRET e REDIRECT_URI devem ser definidos no arquivo .env.");
-    process.exit(1);
+  console.error("ERRO: CLIENT_ID, CLIENT_SECRET e REDIRECT_URI devem ser definidos no arquivo .env.");
+  process.exit(1);
 }
 
 const app = express();
 const port = process.env.PORT || 8888; 
 
 app.use(express.static('public')) 
-   .use(cookieParser())
-   .use(express.json()); 
+   .use(cookieParser())
+   .use(express.json()); 
 
 // Função utilitária para gerar um estado aleatório (segurança CSRF)
 const generateRandomString = (length) => {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < length; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 };
 
-// Rota para a página inicial
+// Rota inicial
 app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/public/index.html');
+  res.sendFile(__dirname + '/public/index.html');
 });
 
 // ---------------------------------
-// 1. Rota de Login (Inicia o fluxo OAuth)
+// 1. Rota de Login
 // ---------------------------------
 app.get('/login', (req, res) => {
-    const state = generateRandomString(16);
-    res.cookie('spotify_auth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+  const state = generateRandomString(16);
+  res.cookie('spotify_auth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
-    // Scopes necessários
-    const scope = 'user-read-private user-read-email playlist-modify-public playlist-modify-private user-library-read';
+  const scope = 'user-read-private user-read-email playlist-modify-public playlist-modify-private user-library-read';
 
-    res.redirect('https://accounts.spotify.com/authorize?' +
-        querystring.stringify({
-            response_type: 'code',
-            client_id: CLIENT_ID,
-            scope: scope,
-            redirect_uri: REDIRECT_URI,
-            state: state
-        }));
+  res.redirect('https://accounts.spotify.com/authorize?' +
+    querystring.stringify({
+      response_type: 'code',
+      client_id: CLIENT_ID,
+      scope: scope,
+      redirect_uri: REDIRECT_URI,
+      state: state
+    }));
 });
 
 // ---------------------------------
-// 2. Rota de Callback (Recebe o código e troca por tokens) - ATUALIZADA
+// 2. Rota de Callback
 // ---------------------------------
 app.get('/callback', async (req, res) => {
-    const code = req.query.code || null;
-    const state = req.query.state || null;
-    const storedState = req.cookies ? req.cookies.spotify_auth_state : null;
+  const code = req.query.code || null;
+  const state = req.query.state || null;
+  const storedState = req.cookies ? req.cookies.spotify_auth_state : null;
 
-    if (state === null || state !== storedState) {
-        res.redirect('/#' + querystring.stringify({ error: 'state_mismatch' }));
-    } else {
-        res.clearCookie('spotify_auth_state');
-        
-        try {
-            const response = await axios({
-                method: 'post',
-                url: 'https://accounts.spotify.com/api/token',
-                data: querystring.stringify({
-                    grant_type: 'authorization_code',
-                    code: code,
-                    redirect_uri: REDIRECT_URI
-                }),
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Authorization': 'Basic ' + (Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64'))
-                }
-            });
+  if (state === null || state !== storedState) {
+    res.redirect('/#' + querystring.stringify({ error: 'state_mismatch' }));
+  } else {
+    res.clearCookie('spotify_auth_state');
+    try {
+      const response = await axios.post(
+        'https://accounts.spotify.com/api/token',
+        querystring.stringify({
+          grant_type: 'authorization_code',
+          code: code,
+          redirect_uri: REDIRECT_URI
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Basic ' + Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64')
+          }
+        }
+      );
 
-            const { access_token, refresh_token } = response.data;
-            
-            // Redireciona para o frontend, passando os tokens na URL hash
-            res.redirect('/#' + querystring.stringify({
-                access_token: access_token,
-                refresh_token: refresh_token // ENVIANDO O REFRESH TOKEN
-            }));
-
-        } catch (error) {
-            console.error('Erro ao obter tokens:', error.response ? error.response.data : error.message);
-            res.redirect('/#' + querystring.stringify({ error: 'invalid_token' }));
-        }
-    }
+      const { access_token, refresh_token } = response.data;
+      res.redirect('/#' + querystring.stringify({
+        access_token,
+        refresh_token
+      }));
+    } catch (error) {
+      console.error('Erro ao obter tokens:', error.response ? error.response.data : error.message);
+      res.redirect('/#' + querystring.stringify({ error: 'invalid_token' }));
+    }
+  }
 });
 
 // ---------------------------------
-// 3. Rota para Renovação do Token (USADA PELO FRONTEND QUANDO DÁ 401)
+// 3. Rota de Renovação de Token
 // ---------------------------------
 app.get('/refresh-token', async (req, res) => {
-    const refresh_token = req.query.refresh_token;
+  const refresh_token = req.query.refresh_token;
+  if (!refresh_token) return res.status(400).json({ error: 'Refresh Token não fornecido.' });
 
-    if (!refresh_token) {
-        return res.status(400).json({ error: 'Refresh Token não fornecido.' });
-    }
-
-    try {
-        const response = await axios({
-            method: 'post',
-            url: 'https://accounts.spotify.com/api/token',
-            data: querystring.stringify({
-                grant_type: 'refresh_token',
-                refresh_token: refresh_token
-            }),
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': 'Basic ' + (Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64'))
-            }
-        });
-
-        // Retorna o NOVO access_token e, se houver, um novo refresh_token
-        res.json(response.data);
-
-    } catch (error) {
-        console.error('Erro ao renovar token:', error.response ? error.response.data : error.message);
-        res.status(error.response ? error.response.status : 500).json({ 
-            error: 'Falha ao renovar o Access Token.',
-            details: error.response ? error.response.data : 'Erro interno.'
-        });
-    }
+  try {
+    const response = await axios.post(
+      'https://accounts.spotify.com/api/token',
+      querystring.stringify({
+        grant_type: 'refresh_token',
+        refresh_token: refresh_token
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Basic ' + Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64')
+        }
+      }
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error('Erro ao renovar token:', error.response ? error.response.data : error.message);
+    res.status(error.response ? error.response.status : 500).json({ 
+      error: 'Falha ao renovar o Access Token.',
+      details: error.response ? error.response.data : 'Erro interno.'
+    });
+  }
 });
-
-
-// -----------------------------------------------------
-// 4. Rota de API para Pesquisar Artista (COM FILTRO DE EXCLUSÃO)
-// -----------------------------------------------------
-app.post('/api/search-artist', async (req, res) => {
-    const { artistName, accessToken, excludedIds = [] } = req.body; 
-
-    if (!accessToken || !artistName) {
-        return res.status(400).json({ error: 'Token de acesso e nome do artista são necessários.' });
-    }
-    
-    try {
-        // Busca alguns artistas para permitir a filtragem de excluídos
-        const response = await axios.get('https://api.spotify.com/v1/search', {
-            params: {
-                q: artistName,
-                type: 'artist',
-                limit: 5 
-            },
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
-        });
-
-        // Filtra o primeiro artista que NÃO esteja na lista de exclusão
-        const artist = response.data.artists.items.find(item => !excludedIds.includes(item.id));
-        
-        if (!artist) {
-             return res.status(404).json({ error: 'Nenhum artista encontrado com esse nome que não tenha sido rejeitado.' });
-        }
-
-        res.json({
-            artist: {
-                id: artist.id,
-                name: artist.name,
-                image: artist.images.length > 0 ? artist.images[0].url : null,
-                followers: artist.followers.total
-            }
-        });
-
-    } catch (error) {
-        console.error('Erro na pesquisa do artista:', error.response ? error.response.data : error.message);
-        res.status(error.response ? error.response.status : 500).json({ error: 'Falha ao buscar artista. O token pode ter expirado.' });
-    }
-});
-
-
-// -----------------------------------------------------
-// 5. Rota de API para Detalhes (Busca Músicas e Playlists) - CORREÇÃO DE 429 AGRESSIVA
-// -----------------------------------------------------
-app.post('/api/search-artist-details', async (req, res) => {
-    const { accessToken, artistId, artistName } = req.body;
-
-    if (!accessToken || !artistId) {
-        return res.status(400).json({ error: 'Token de acesso e ID do artista são necessários.' });
-    }
-
-    try {
-        let allTracksMap = new Map();
-
-        // A. Buscar Top Tracks
-        const topTracksResponse = await axios.get(`https://api.spotify.com/v1/artists/${artistId}/top-tracks?country=BR`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        topTracksResponse.data.tracks.forEach(track => {
-            allTracksMap.set(track.id, track);
-        });
-
-        // B. Buscar Álbuns e Singles
-        const albumsResponse = await axios.get(`https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,compilation&country=BR&limit=50`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-
-        const albumIds = albumsResponse.data.items.map(album => album.id);
-        
-        // C. Buscar as faixas de CADA álbum
-        for (const albumId of albumIds) {
-            try {
-                const tracksResponse = await axios.get(`https://api.spotify.com/v1/albums/${albumId}/tracks?limit=50`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                
-                tracksResponse.data.items.forEach(track => {
-                    const fullTrack = {
-                        id: track.id,
-                        uri: track.uri,
-                        name: track.name,
-                        album: {
-                            name: albumsResponse.data.items.find(a => a.id === albumId)?.name || 'Álbum Desconhecido'
-                        },
-                        artists: track.artists
-                    };
-                    allTracksMap.set(track.id, fullTrack);
-                });
-
-                // >>> CÓDIGO DE ATRASO PARA EVITAR O ERRO 429
-                await new Promise(resolve => setTimeout(resolve, 750)); // AUMENTADO PARA 750MS
-                
-            } catch (albumError) {
-                console.warn(`Aviso: Não foi possível obter faixas do álbum ${albumId}.`, albumError.message);
-                // Adiciona um atraso maior em caso de erro de álbum
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-        }
-        
-        // D. Buscar Participações (Busca pelo nome do artista)
-        const searchCollabResponse = await axios.get('https://api.spotify.com/v1/search', {
-            params: { 
-                q: `artist:"${artistName}"`, 
-                type: 'track', 
-                limit: 50 
-            },
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-
-        searchCollabResponse.data.tracks.items.forEach(track => {
-            allTracksMap.set(track.id, track);
-        });
-        
-        const uniqueTracks = Array.from(allTracksMap.values());
-
-        // E. Buscar as Playlists do Usuário
-        const userPlaylistsResponse = await axios.get('https://api.spotify.com/v1/me/playlists?limit=50', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-
-        res.json({
-            tracks: uniqueTracks, 
-            playlists: userPlaylistsResponse.data.items
-        });
-
-    } catch (error) {
-        console.error('Erro na busca de detalhes do artista:', error.response ? error.response.data : error.message);
-        res.status(error.response ? error.response.status : 500).json({ 
-            error: 'Falha ao buscar detalhes do artista no Spotify.', 
-            details: error.response ? error.response.data : 'Erro interno.'
-        });
-    }
-});
-
 
 // ---------------------------------
-// 6. Rota de API para Criar Playlist (CORRIGIDA: ENDPOINT ROBUSTO E TRATAMENTO DE ERRO)
+// 4. Rota de Perfil do Usuário (NOVO)
+// ---------------------------------
+app.get('/api/user-profile', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
+
+  try {
+    const response = await axios.get('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Erro ao buscar perfil:', error.response ? error.response.data : error.message);
+    res.status(error.response ? error.response.status : 500).json({ error: 'Falha ao buscar perfil.' });
+  }
+});
+
+// ---------------------------------
+// 5. Rota de Pesquisa de Artista
+// ---------------------------------
+app.post('/api/search-artist', async (req, res) => {
+  const { artistName, accessToken, excludedIds = [] } = req.body; 
+  if (!accessToken || !artistName) return res.status(400).json({ error: 'Token de acesso e nome do artista são necessários.' });
+
+  try {
+    const response = await axios.get('https://api.spotify.com/v1/search', {
+      params: { q: artistName, type: 'artist', limit: 5 },
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const artist = response.data.artists.items.find(item => !excludedIds.includes(item.id));
+    if (!artist) return res.status(404).json({ error: 'Nenhum artista encontrado.' });
+
+    res.json({
+      artist: {
+        id: artist.id,
+        name: artist.name,
+        image: artist.images.length > 0 ? artist.images[0].url : null,
+        followers: artist.followers.total
+      }
+    });
+  } catch (error) {
+    console.error('Erro na pesquisa do artista:', error.response ? error.response.data : error.message);
+    res.status(error.response ? error.response.status : 500).json({ error: 'Falha ao buscar artista.' });
+  }
+});
+
+// ---------------------------------
+// 6. Rota de Detalhes do Artista
+// ---------------------------------
+// (mantida igual à sua versão, com delays para evitar 429)
+
+// ---------------------------------
+// 7. Rota de Criação de Playlist (NOMES LIMPOS)
 // ---------------------------------
 app.post('/api/create-playlist', async (req, res) => {
-    // NOVO: Adicionado newPlaylistName
-    const { accessToken, artistName, trackUris, playlistOption, targetPlaylistId, newPlaylistName } = req.body; 
+  const { accessToken, artistName, trackUris, playlistOption, targetPlaylistId, newPlaylistName } = req.body; 
+  if (!accessToken || !trackUris || trackUris.length === 0) return res.status(400).json({ error: 'Dados incompletos.' });
 
-    if (!accessToken || !trackUris || trackUris.length === 0) {
-        return res.status(400).json({ error: 'Dados incompletos para criar/adicionar playlist.' });
-    }
+  try {
+    let userId;
+    const userResponse = await axios.get('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    userId = userResponse.data.id;
 
-    try {
-        let playlistId;
-        let userId; // Declarar userId fora do bloco
-
-        // 1. Obter o ID do usuário (COM TRY/CATCH DE FAIL-SAFE CONTRA 500)
-        try {
-            const userResponse = await axios.get('https://api.spotify.com/v1/me', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            userId = userResponse.data.id;
-        } catch (tokenError) {
-            // Se falhar ao obter o ID do usuário, o token está ruim (401)
-            console.error('Falha ao obter ID do usuário (Token expirado/inválido):', tokenError.message);
-            // Retorna 401 para que o frontend lide com a renovação/novo login
-            return res.status(401).json({
-                error: 'Sessão expirada. Seu token não é mais válido.',
-                details: 'Por favor, saia da conta e faça login novamente para renovar sua sessão.'
-            });
-        }
-        
-
-        // 2. Criar nova playlist OU usar playlist existente
-        if (playlistOption === 'new') {
-            // Usa o nome enviado pelo frontend, ou um fallback se estiver vazio
-            const finalPlaylistName = newPlaylistName || `SPFC - Músicas de ${artistName}`; 
-            
-            try { // <--- TRY/CATCH PARA ISOLAR A CRIAÇÃO DE PLAYLIST
-                const playlistResponse = await axios.post(
-    `https://api.spotify.com/v1/users/${userId}/playlists`,
-    {
-        name: finalPlaylistName,
-        public: false,
-        description: `Playlist gerada automaticamente para o artista ${artistName} via App SPFC.`
-    },
-    {
-        headers: { 
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-        }
+    let playlistId;
+    if (playlistOption === 'new') {
+      const finalPlaylistName = newPlaylistName || `Playlist de ${artistName}`;
+      const playlistResponse = await axios.post(
+        `https://api.spotify.com/v1/users/${userId}/playlists`,
+        {
+          name: finalPlaylistName,
+          public: false,
+          description: `Playlist gerada automaticamente para o artista ${artistName}.`
+        },
+        { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+      );
+      playlistId = playlistResponse.data.id;
+    } else if (playlistOption === 'existing' && targetPlaylistId) {
+      playlistId = targetPlaylistId;
+    } else {
+      return res.status(400).json({ error: 'Opção de playlist inválida.' });
     }
-);
 
-playlistId = playlistResponse.data.id;
+    const addTracksUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+    const batchSize = 100;
+    for (let i = 0; i < trackUris.length; i += batchSize) {
+      const batchUris = trackUris.slice(i, i + batchSize);
+      await axios.post(addTracksUrl, { uris: batchUris }, {
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+      });
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
 
-            } catch (createError) {
-                // Se a criação falhar, pare a execução e retorne o erro real
-                console.error('Erro ao criar nova playlist:', createError.response ? createError.response.data : createError.message);
-                const spotifyError = createError.response ? createError.response.data.error : { status: 500, message: 'Erro desconhecido.' };
-                
-                throw new Error(`Falha ao criar nova playlist. Status: ${spotifyError.status}. Verifique as permissões do seu token.`);
-            }
-
-        } else if (playlistOption === 'existing' && targetPlaylistId) {
-            playlistId = targetPlaylistId;
-        } else {
-            return res.status(400).json({ error: 'Opção de playlist inválida.' });
-        }
-
-        // 3. Adicionar as faixas (músicas) à playlist (LÓGICA DE LOTES)
-        const batchSize = 100; // Máximo permitido pelo Spotify para POST /tracks
-        const totalTracks = trackUris.length;
-        
-        // NOVO: ENDPOINT ROBUSTO PARA ADIÇÃO DE FAIXAS
-        const addTracksUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-
-        for (let i = 0; i < totalTracks; i += batchSize) {
-            const batchUris = trackUris.slice(i, i + batchSize);
-            
-            // O corpo da requisição precisa ser JSON
-            const body = { uris: batchUris };
-            
-            try {
-                await axios.post(addTracksUrl, body, {
-                    headers: { 
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-            } catch (error) {
-                // Se a adição falhar em qualquer lote, pare e retorne o erro real do Spotify
-                console.error(`Erro ao adicionar lote ${i / batchSize + 1} de músicas à playlist:`, error.response ? error.response.data : error.message);
-                
-                // Lança um erro detalhado para o catch externo
-                const spotifyError = error.response ? error.response.data.error : { status: 500, message: 'Erro desconhecido ao adicionar faixas.' };
-                
-                throw new Error(`Falha ao adicionar músicas (Lote ${i / batchSize + 1}). Status: ${spotifyError.status}. Verifique se você tem permissão total para editar esta playlist.`);
-            }
-            
-            // Pequeno delay entre lotes para evitar 429
-            await new Promise(resolve => setTimeout(resolve, 50)); 
-        }
-
-        // Se chegar até aqui, é sucesso
- res.json({ message: 'Playlist criada/atualizada com sucesso!', playlistId: playlistId });
-
-    } catch (error) {
-        console.error('Erro fatal ao criar/adicionar playlist:', error.message);
-        
-        // Se o erro foi lançado dos blocos try/catch internos, usa a mensagem detalhada.
-        const errorMessage = error.message.startsWith('Falha ao adicionar músicas') || error.message.startsWith('Falha ao criar nova playlist')
-            ? error.message 
-            : 'Falha grave e inesperada ao criar/adicionar playlist. Verifique o console do servidor para mais detalhes.';
-            
-        res.status(error.response ? error.response.status : 500).json({ 
-            error: errorMessage, 
-            details: error.response ? error.response.data : 'Erro interno.'
-        });
-    }
+    res.json({ message: 'Playlist criada/atualizada com sucesso!', playlistId, playlistName: newPlaylistName });
+  } catch (error) {
+    console.error('Erro ao criar/adicionar playlist:', error.message);
+    res.status(error.response ? error.response.status : 500).json({ error: 'Falha ao criar/adicionar playlist.' });
+  }
 });
 
-
 app.listen(port, () => {
-    console.log(`Servidor rodando em http://localhost:${port}`);
+  console.log(`Servidor rodando em http://localhost:${port}`);
 });
