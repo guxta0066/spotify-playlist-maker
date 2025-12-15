@@ -339,3 +339,15 @@ footer {
         text-align: center;
     }
 }
+
+.confirmation-buttons {
+    display: flex;
+    gap: 10px;
+    margin-left: auto; /* Alinha à direita no layout flex */
+    align-items: center;
+}
+
+.btn-small {
+    padding: 8px 15px;
+    font-size: 0.9rem;
+}
