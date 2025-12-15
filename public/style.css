@@ -20,9 +20,9 @@ header {
     font-weight: bold;
 }
 
-.cor1 { color: #ff0000; } /* vermelho */
-.cor2 { color: #000000; } /* preto */
-.cor3 { color: #ffffff; } /* branco */
+.cor1 { color: #ff0000; }
+.cor2 { color: #000000; }
+.cor3 { color: #ffffff; }
 
 .btn {
     padding: 0.6rem 1rem;
