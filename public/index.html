@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SPFC Playlists - Spotify Creator</title>
+    <title>Spotify - Playlist Creator</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚽%3C/text%3E%3C/svg%3E">
 </head>
 <body>
     <header>
         <div class="logo">
-            <span class="cor1">S</span>
-            <span class="cor2">P</span>
-            <span class="cor3">F</span>
-            <span class="cor1">C</span> Playlists
+            <span class="cor1">P</span>
+            <span class="cor2">L</span>
+            <span class="cor3">A</span>
+            <span class="cor1">Y</span> Lists
         </div>
         <div class="theme-switcher">
             <input type="checkbox" id="theme-toggle" checked>
@@ -24,7 +24,7 @@
 
     <main>
         <section id="login-screen" class="card initial-card">
-            <h2>Bem-vindo(a) ao Gerador SPFC de Playlists!</h2>
+            <h2>Bem-vindo(a) ao Gerador de Playlists!</h2>
             <p>Conecte-se com sua conta Spotify para começar.</p>
             <a href="/login" class="btn primary-btn">Entrar com Spotify</a>
             <div id="login-error" class="error-message"></div>
@@ -37,7 +37,7 @@
             </div>
             
             <div class="search-area">
-                <input type="text" id="artist-search" placeholder="Pesquisar Artista (Ex: Queen, Anitta, Racionais)" class="input-field">
+                <input type="text" id="artist-search" placeholder="Pesquisar Artista (Ex: Fernandinho, Ao Cubo)" class="input-field">
                 <button id="search-btn" class="btn secondary-btn">Buscar</button>
             </div>
             
@@ -68,7 +68,7 @@
                     </div>
 
                     <div class="option-item">
-                        <label>Destino da Playlist:</label>
+                        <label>Destino das Músicas:</label>
                         <select id="playlist-destination" class="input-field">
                             <option value="new">Criar Nova Playlist</option>
                             <option value="existing">Adicionar a uma Playlist Existente</option>
@@ -76,7 +76,7 @@
                         
                         <div id="new-playlist-name-container" class="hidden"> 
                             <p id="playlist-name-suggestion" class="suggestion-text hidden">
-                                **Sugestão de Nome:** Clique para usar <span class="suggestion-name"></span>
+                                Sugestão de Nome: Clique para usar <span class="suggestion-name"></span>
                             </p>
                             
                             <input type="text" id="new-playlist-name" class="input-field" placeholder="Dê um nome à sua nova playlist" value="" required>
@@ -100,7 +100,7 @@
     </main>
 
     <footer>
-        © 2025 SPFC Playlists Creator - Feito com a API do Spotify
+        © 2025 Playlists Creator - Feito com a API do Spotify by Guxta
     </footer>
 
     <script src="script.js"></script>

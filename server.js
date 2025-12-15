@@ -312,7 +312,7 @@ app.post('/api/create-playlist', async (req, res) => {
         // 2. Criar nova playlist OU usar playlist existente
         if (playlistOption === 'new') {
             // Usa o nome enviado pelo frontend, ou um fallback se estiver vazio
-            const finalPlaylistName = newPlaylistName || `SPFC - Músicas de ${artistName}`; 
+            const finalPlaylistName = newPlaylistName || `Músicas de ${artistName}`; 
             
             try { // <--- TRY/CATCH PARA ISOLAR A CRIAÇÃO DE PLAYLIST
                 const playlistResponse = await axios.post(
@@ -320,7 +320,7 @@ app.post('/api/create-playlist', async (req, res) => {
     {
         name: finalPlaylistName,
         public: false,
-        description: `Playlist gerada automaticamente para o artista ${artistName} via App SPFC.`
+        description: `Playlist gerada automaticamente para o artista ${artistName} via App.`
     },
     {
         headers: { 

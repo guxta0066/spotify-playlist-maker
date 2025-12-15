@@ -338,7 +338,7 @@ const fetchTracksAndPlaylists = async () => {
         populateTracksList(data.tracks);
         
         // --- LÓGICA DE SUGESTÃO DE NOME ---
-        const suggestedName = `SPFC - Músicas de ${artistName}`;
+        const suggestedName = `Músicas de ${artistName}`;
         
         playlistNameSuggestion.querySelector('.suggestion-name').textContent = `"${suggestedName}"`;
         playlistNameSuggestion.classList.remove('hidden');
@@ -471,8 +471,8 @@ const createPlaylist = async () => {
         const data = await response.json();
         
         creationStatus.className = 'status-message success-message';
-        const action = playlistOption === 'new' ? 'Criada' : 'Atualizada';
-        creationStatus.innerHTML = `${action} com sucesso! ID: ${data.playlistId}.<br>Abra seu Spotify para conferir!`;
+        const action = playlistOption === 'new' ? 'Playlist Criada' : 'Atualizada';
+        creationStatus.innerHTML = `${action} com sucesso! NOME: ${data.playlistName}.<br>Abra seu Spotify para conferir!`;
         
         if (playlistOption === 'new') {
              fetchTracksAndPlaylists(); 
