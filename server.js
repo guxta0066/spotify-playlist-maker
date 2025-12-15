@@ -1,4 +1,4 @@
-// server.js - CÓDIGO FINAL E OTIMIZADO
+// server.js - CÓDIGO FINAL COM CORREÇÃO DE CRIAÇÃO (FAIL SAFE) E DELAY 1000MS
 require('dotenv').config(); 
 const express = require('express');
 const axios = require('axios');
@@ -104,36 +104,36 @@ app.get('/callback', async (req, res) => {
 // 3. Rota para Renovação do Token (USADA PELO FRONTEND QUANDO DÁ 401)
 // ---------------------------------
 app.get('/refresh-token', async (req, res) => {
-    const refresh_token = req.query.refresh_token;
+    const refresh_token = req.query.refresh_token;
 
-    if (!refresh_token) {
-        return res.status(400).json({ error: 'Refresh Token não fornecido.' });
-    }
+    if (!refresh_token) {
+        return res.status(400).json({ error: 'Refresh Token não fornecido.' });
+    }
 
-    try {
-        const response = await axios({
-            method: 'post',
-            url: 'https://accounts.spotify.com/api/token',
-            data: querystring.stringify({
-                grant_type: 'refresh_token',
-                refresh_token: refresh_token
-            }),
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': 'Basic ' + (Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64'))
-            }
-        });
+    try {
+        const response = await axios({
+            method: 'post',
+            url: 'https://accounts.spotify.com/api/token',
+            data: querystring.stringify({
+                grant_type: 'refresh_token',
+                refresh_token: refresh_token
+            }),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + (Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64'))
+            }
+        });
 
-        // Retorna o NOVO access_token e, se houver, um novo refresh_token
-        res.json(response.data);
+        // Retorna o NOVO access_token e, se houver, um novo refresh_token
+        res.json(response.data);
 
-    } catch (error) {
-        console.error('Erro ao renovar token:', error.response ? error.response.data : error.message);
-        res.status(error.response ? error.response.status : 500).json({ 
-            error: 'Falha ao renovar o Access Token.',
-            details: error.response ? error.response.data : 'Erro interno.'
-        });
-    }
+    } catch (error) {
+        console.error('Erro ao renovar token:', error.response ? error.response.data : error.message);
+        res.status(error.response ? error.response.status : 500).json({ 
+            error: 'Falha ao renovar o Access Token.',
+            details: error.response ? error.response.data : 'Erro interno.'
+        });
+    }
 });
 
 
@@ -301,18 +301,27 @@ app.post('/api/create-playlist', async (req, res) => {
         if (playlistOption === 'new') {
             // Usa o nome enviado pelo frontend, ou um fallback se estiver vazio
             const finalPlaylistName = newPlaylistName || `SPFC - Músicas de ${artistName}`; 
+            
+            try { // <--- NOVO: TRY/CATCH PARA ISOLAR A CRIAÇÃO DE PLAYLIST
+                const playlistResponse = await axios.post(`https://www.google.com/search?q=https://api.spotify.com/v1/artists/%24{userId}/playlists`, {
+                    name: finalPlaylistName, // <--- USA O NOME FINAL E PERSONALIZADO
+                    public: false, // Criar como privada por padrão
+                    description: `Playlist gerada automaticamente para o artista ${artistName} via App SPFC.`
+                }, {
+                    headers: { 
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                playlistId = playlistResponse.data.id;
+            } catch (createError) {
+                // Se a criação falhar, pare a execução e retorne o erro real
+                console.error('Erro ao criar nova playlist:', createError.response ? createError.response.data : createError.message);
+                const spotifyError = createError.response ? createError.response.data.error : { status: 500, message: 'Erro desconhecido.' };
+                
+                throw new Error(`Falha ao criar nova playlist. Status: ${spotifyError.status}. Verifique as permissões do seu token.`);
+            }
 
-            const playlistResponse = await axios.post(`https://www.google.com/search?q=https://api.spotify.com/v1/artists/%24{userId}/playlists`, {
-                name: finalPlaylistName, // <--- USA O NOME FINAL E PERSONALIZADO
-                public: false, // Criar como privada por padrão
-                description: `Playlist gerada automaticamente para o artista ${artistName} via App SPFC.`
-            }, {
-                headers: { 
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            playlistId = playlistResponse.data.id;
         } else if (playlistOption === 'existing' && targetPlaylistId) {
             playlistId = targetPlaylistId;
         } else {
@@ -322,48 +331,48 @@ app.post('/api/create-playlist', async (req, res) => {
         // 3. Adicionar as faixas (músicas) à playlist (LÓGICA DE LOTES)
         const batchSize = 100; // Máximo permitido pelo Spotify para POST /tracks
         const totalTracks = trackUris.length;
-        
-        // NOVO: ENDPOINT ROBUSTO PARA ADIÇÃO DE FAIXAS
-        const addTracksUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+        
+        // NOVO: ENDPOINT ROBUSTO PARA ADIÇÃO DE FAIXAS
+        const addTracksUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
 
         for (let i = 0; i < totalTracks; i += batchSize) {
             const batchUris = trackUris.slice(i, i + batchSize);
             
-            // O corpo da requisição precisa ser JSON
-            const body = { uris: batchUris };
-            
+            // O corpo da requisição precisa ser JSON
+            const body = { uris: batchUris };
+            
             try {
-                await axios.post(addTracksUrl, body, {
-                    headers: { 
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-            } catch (error) {
-                // Se a adição falhar em qualquer lote, pare e retorne o erro real do Spotify
-                console.error(`Erro ao adicionar lote ${i / batchSize + 1} de músicas à playlist:`, error.response ? error.response.data : error.message);
-                
-                // Lança um erro detalhado para o catch externo
-                const spotifyError = error.response ? error.response.data.error : { status: 500, message: 'Erro desconhecido ao adicionar faixas.' };
-                
-                throw new Error(`Falha ao adicionar músicas (Lote ${i / batchSize + 1}). Status: ${spotifyError.status}. Verifique se você tem permissão total para editar esta playlist.`);
-            }
+                await axios.post(addTracksUrl, body, {
+                    headers: { 
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+            } catch (error) {
+                // Se a adição falhar em qualquer lote, pare e retorne o erro real do Spotify
+                console.error(`Erro ao adicionar lote ${i / batchSize + 1} de músicas à playlist:`, error.response ? error.response.data : error.message);
+                
+                // Lança um erro detalhado para o catch externo
+                const spotifyError = error.response ? error.response.data.error : { status: 500, message: 'Erro desconhecido ao adicionar faixas.' };
+                
+                throw new Error(`Falha ao adicionar músicas (Lote ${i / batchSize + 1}). Status: ${spotifyError.status}. Verifique se você tem permissão total para editar esta playlist.`);
+            }
             
             // Pequeno delay entre lotes para evitar 429
             await new Promise(resolve => setTimeout(resolve, 50)); 
         }
 
-        // Se chegar até aqui, é sucesso
+        // Se chegar até aqui, é sucesso
  res.json({ message: 'Playlist criada/atualizada com sucesso!', playlistId: playlistId });
 
     } catch (error) {
         console.error('Erro fatal ao criar/adicionar playlist:', error.message);
         
-        // Se o erro foi lançado do try/catch interno (problema de permissão), use a mensagem detalhada
-        const errorMessage = error.message.startsWith('Falha ao adicionar músicas') 
-            ? error.message 
-            : 'Falha grave ao criar ou adicionar músicas à playlist. Verifique o console do servidor para detalhes.';
-            
+        // Se o erro foi lançado dos blocos try/catch internos, usa a mensagem detalhada.
+        const errorMessage = error.message.startsWith('Falha ao adicionar músicas') || error.message.startsWith('Falha ao criar nova playlist')
+            ? error.message 
+            : 'Falha grave e inesperada ao criar/adicionar playlist. Verifique o console do servidor para mais detalhes.';
+            
         res.status(error.response ? error.response.status : 500).json({ 
             error: errorMessage, 
             details: error.response ? error.response.data : 'Erro interno.'
