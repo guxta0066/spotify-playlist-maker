@@ -315,17 +315,23 @@ app.post('/api/create-playlist', async (req, res) => {
             const finalPlaylistName = newPlaylistName || `SPFC - Músicas de ${artistName}`; 
             
             try { // <--- TRY/CATCH PARA ISOLAR A CRIAÇÃO DE PLAYLIST
-                const playlistResponse = await axios.post(`https://www.google.com/search?q=https://api.spotify.com/v1/artists/%24{userId}/playlists`, {
-                    name: finalPlaylistName, // <--- USA O NOME FINAL E PERSONALIZADO
-                    public: false, // Criar como privada por padrão
-                    description: `Playlist gerada automaticamente para o artista ${artistName} via App SPFC.`
-                }, {
-                    headers: { 
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                playlistId = playlistResponse.data.id;
+                const playlistResponse = await axios.post(
+    `https://api.spotify.com/v1/users/${userId}/playlists`,
+    {
+        name: finalPlaylistName,
+        public: false,
+        description: `Playlist gerada automaticamente para o artista ${artistName} via App SPFC.`
+    },
+    {
+        headers: { 
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+        }
+    }
+);
+
+playlistId = playlistResponse.data.id;
+
             } catch (createError) {
                 // Se a criação falhar, pare a execução e retorne o erro real
                 console.error('Erro ao criar nova playlist:', createError.response ? createError.response.data : createError.message);
